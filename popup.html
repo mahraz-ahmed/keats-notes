@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KEATS Video Summariser</title>
+  <style>
+    :root {
+      --kcl: #c41230;          /* Flat King's Red */
+      --kcl-hover: #a80f28;    /* Darker flat red */
+      --kcl-light: #fef2f2;    /* Flat light tint */
+      --kcl-border: #fecaca;   /* Flat red border */
+      --text: #111827;         /* Deep slate */
+      --muted: #6b7280;        /* Gray 500 */
+      --border: #e5e7eb;       /* Gray 200 */
+      --bg: #f9fafb;           /* Gray 50 */
+      --danger: #b91c1c;
+      --danger-bg: #fef2f2;
+      --warn: #92400e;
+      --warn-bg: #fffbeb;
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      width: 440px;
+      max-height: 600px;
+      overflow-y: auto;
+      font: 13.5px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    :focus-visible { outline: 2px solid var(--kcl); outline-offset: 1px; }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--kcl);
+      color: #fff;
+    }
+    .brand-title {
+      margin: 0;
+      font-size: 14.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: none;
+    }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 500;
+    }
+    .switch { position: relative; width: 32px; height: 18px; flex: none; }
+    .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .slider {
+      position: absolute; inset: 0; border-radius: 9px;
+      background: rgba(255, 255, 255, 0.35); transition: background .12s;
+      pointer-events: none;
+    }
+    .slider::before {
+      content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px;
+      border-radius: 50%; background: #fff; transition: transform .12s;
+    }
+    .switch input:checked + .slider { background: #059669; }
+    .switch input:checked + .slider::before { transform: translateX(14px); }
+    .switch input:focus-visible + .slider { outline: 2px solid #fff; outline-offset: 1px; }
+    .icon-btn {
+      background: transparent; border: 1px solid rgba(255, 255, 255, 0.4); color: #fff;
+      width: 28px; height: 28px; border-radius: 4px;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background .1s, border-color .1s;
+      padding: 0;
+    }
+    .icon-btn:hover, .icon-btn:focus-visible { background: rgba(255, 255, 255, 0.2); border-color: #fff; }
+
+    main { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+    /* Banners / messages */
+    .banner {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: var(--radius);
+      background: var(--warn-bg); color: var(--warn); border: 1px solid #fef3c7;
+      font-size: 12.5px; font-weight: 500;
+    }
+    .banner span { flex: 1; }
+    .msg {
+      padding: 7px 11px; border-radius: var(--radius); font-size: 12.5px;
+      background: var(--danger-bg); color: var(--danger); border: 1px solid var(--kcl-border);
+      font-weight: 500;
+    }
+    .msg.msg-success {
+      background: #f0fdf4; color: #166534; border-color: #bbf7d0;
+    }
+    [hidden] { display: none !important; }
+
+    .scan-status {
+      padding: 7px 10px; border-radius: 4px; font-size: 12px;
+      margin-bottom: 8px; line-height: 1.4; font-weight: 500;
+    }
+    .scan-status.info { background: var(--kcl-light); color: var(--kcl); border: 1px solid var(--kcl-border); }
+    .scan-status.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .scan-status.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #fef3c7; }
+
+    /* Buttons */
+    .btn {
+      border-radius: var(--radius); padding: 7px 13px; font-weight: 500; font-size: 12.5px;
+      border: 1px solid transparent; transition: background .1s, border-color .1s, color .1s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary {
+      background: var(--kcl); color: #fff; border-color: var(--kcl);
+    }
+    .btn-primary:hover:not(:disabled), .btn-primary:focus-visible {
+      background: var(--kcl-hover); border-color: var(--kcl-hover);
+    }
+    .btn-secondary {
+      background: #fff; color: #374151; border-color: #d1d5db;
+    }
+    .btn-secondary:hover:not(:disabled), .btn-secondary:focus-visible {
+      background: #f9fafb; color: var(--text); border-color: #9ca3af;
+    }
+    .btn-small { padding: 4px 9px; font-size: 11.5px; border-radius: 4px; }
+    .btn:disabled { opacity: .45; }
+    .actions { display: flex; gap: 8px; }
+    .actions .btn-primary { flex: 1; }
+
+    /* Panels */
+    .panel {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 11px 13px;
+    }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .panel-head h2 { margin: 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .empty { color: var(--muted); font-size: 12.5px; margin: 4px 0; }
+
+    /* Queue */
+    #queueList { list-style: decimal; margin: 0; padding: 0 0 0 20px; max-height: 200px; overflow-y: auto; }
+    #queueList li { padding: 6px 4px; border-bottom: 1px solid #f3f4f6; }
+    #queueList li:last-child { border-bottom: none; }
+    #queueList li::marker { color: var(--muted); font-size: 11.5px; }
+    .q-row { display: flex; align-items: flex-start; gap: 6px; }
+    .q-body { flex: 1; min-width: 0; }
+    .q-title { font-weight: 500; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q-meta { font-size: 11.5px; color: var(--muted); }
+    .q-remove {
+      flex: none; width: 20px; height: 20px; border-radius: 3px;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      font-size: 14px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+      transition: background .1s, color .1s;
+    }
+    .q-remove:hover, .q-remove:focus-visible { background: var(--danger-bg); color: var(--danger); }
+    .q-remove:disabled { opacity: .4; }
+
+    /* Notes */
+    .notes-meta { font-size: 11.5px; color: var(--muted); margin: 0 0 8px; }
+    .spinner-row { display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 8px 0; font-size: 12.5px; }
+    .spinner {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--border); border-top-color: var(--kcl);
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+    .notes {
+      max-height: 360px; overflow-y: auto; padding-right: 4px;
+      font-size: 13px; word-wrap: break-word; overflow-wrap: anywhere; line-height: 1.55;
+    }
+    .notes h1, .notes h2, .notes h3, .notes h4, .notes h5, .notes h6 { color: #111827; line-height: 1.3; margin: 14px 0 6px; }
+    .notes h1 { font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .notes h2 { font-size: 14.5px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+    .notes h3 { font-size: 13.5px; }
+    .notes h4, .notes h5, .notes h6 { font-size: 12.5px; }
+    .notes > :first-child { margin-top: 0; }
+    .notes p { margin: 6px 0; }
+    .notes ul, .notes ol { margin: 4px 0; padding-left: 20px; }
+    .notes li { margin: 2px 0; }
+    .notes a { color: var(--kcl); text-decoration: underline; }
+    .notes code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+      background: #f3f4f6; padding: 2px 4px; border-radius: 3px; color: #111827;
+    }
+    .notes pre { background: #1f2937; color: #f9fafb; padding: 10px 12px; border-radius: 4px; overflow-x: auto; }
+    .notes pre code { background: none; padding: 0; color: inherit; white-space: pre; }
+    .notes blockquote { margin: 8px 0; padding: 4px 10px; border-left: 3px solid var(--kcl); background: #f9fafb; color: #4b5563; }
+    .notes hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+    .notes table { border-collapse: collapse; margin: 8px 0; font-size: 12px; width: 100%; }
+    .notes th, .notes td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; vertical-align: top; }
+    .notes th { background: #f9fafb; font-weight: 600; }
+    .error-box {
+      padding: 9px 11px; border-radius: var(--radius); margin-bottom: 8px;
+      background: var(--danger-bg); color: var(--danger); border: 1px solid var(--kcl-border); font-size: 12.5px;
+      white-space: pre-wrap; word-wrap: break-word;
+    }
+
+    /* Q&A / Prompting */
+    .qa-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 8px; }
+    .qa-chip {
+      background: #fff; border: 1px solid var(--border); border-radius: 4px;
+      padding: 3px 8px; font-size: 11px; color: #374151;
+      transition: background .1s, border-color .1s, color .1s;
+      white-space: nowrap; line-height: 1.3;
+    }
+    .qa-chip:hover, .qa-chip:focus-visible {
+      background: var(--kcl-light); border-color: var(--kcl); color: var(--kcl);
+    }
+    .qa-messages {
+      max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+      margin: 8px 0; padding-right: 4px;
+    }
+    .qa-msg-user {
+      align-self: flex-end; max-width: 85%;
+      background: var(--kcl); color: #fff;
+      padding: 7px 11px; border-radius: 4px;
+      font-size: 12.5px; line-height: 1.4; word-break: break-word;
+    }
+    .qa-msg-model {
+      align-self: flex-start; max-width: 95%; width: 100%;
+      background: #f9fafb; border: 1px solid var(--border); border-left: 3px solid var(--kcl);
+      padding: 9px 11px; border-radius: 4px;
+      font-size: 12.5px; line-height: 1.45; word-break: break-word;
+    }
+    .qa-msg-model h1, .qa-msg-model h2, .qa-msg-model h3 { color: #111827; margin: 6px 0 3px; font-size: 13px; }
+    .qa-msg-model p { margin: 3px 0; }
+    .qa-msg-model ul, .qa-msg-model ol { margin: 3px 0; padding-left: 18px; }
+    .qa-msg-model pre { background: #1f2937; color: #f9fafb; padding: 8px 10px; border-radius: 4px; overflow-x: auto; max-height: 180px; }
+    .qa-msg-model code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; background: #e5e7eb; padding: 1px 4px; border-radius: 3px; color: #111827; }
+    .qa-msg-model pre code { background: none; padding: 0; color: inherit; }
+    .qa-msg-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px; color: var(--muted); font-weight: 600; }
+    .qa-copy-btn { background: #fff; border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 10.5px; color: var(--muted); cursor: pointer; transition: all .1s; }
+    .qa-copy-btn:hover { color: var(--kcl); border-color: var(--kcl); }
+    .qa-form { display: flex; gap: 6px; align-items: flex-end; margin-top: 8px; }
+    .qa-input {
+      flex: 1; resize: none; min-height: 38px; max-height: 90px;
+      padding: 7px 10px; border-radius: 4px; border: 1px solid var(--border);
+      font: inherit; font-size: 12.5px; line-height: 1.35;
+      background: #fff; color: var(--text);
+    }
+    .qa-input:focus { outline: none; border-color: var(--kcl); }
+    .qa-send { flex: none; height: 38px; padding: 0 13px; }
+
+    /* Responsive Full-Page Desktop Mode */
+    @media (min-width: 600px) {
+      body {
+        width: 100vw !important;
+        max-width: 100% !important;
+        max-height: none !important;
+        height: auto !important;
+        min-height: 100vh;
+        background: #f3f4f6;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 14px 28px !important;
+      }
+      .brand-title {
+        font-size: 16px !important;
+      }
+      main {
+        max-width: 900px;
+        width: 100%;
+        margin: 24px auto !important;
+        padding: 0 20px 48px !important;
+        gap: 16px !important;
+      }
+      #openTabBtn {
+        display: none !important;
+      }
+      .notes {
+        max-height: 520px !important;
+        font-size: 13.5px !important;
+      }
+      .qa-messages {
+        max-height: 440px !important;
+      }
+      .panel {
+        padding: 14px 18px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 class="brand-title">KEATS Video Summariser</h1>
+    <div class="header-right">
+      <label class="toggle" title="Automatically capture transcripts when you open a KEATS video's Transcript panel">
+        <span class="switch">
+          <input type="checkbox" id="autoCapture" role="switch" checked>
+          <span class="slider"></span>
+        </span>
+        <span>Auto-capture</span>
+      </label>
+      <button type="button" id="openTabBtn" class="icon-btn" title="Open full dashboard in a new tab" aria-label="Open in new tab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      </button>
+      <button type="button" id="openOptions" class="icon-btn" title="Settings" aria-label="Open settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div id="apiKeyBanner" class="banner" role="alert" hidden>
+      <span>No Gemini API key set. Add one to generate notes.</span>
+      <button type="button" id="setApiKey" class="btn btn-primary btn-small">Set API key</button>
+    </div>
+
+    <div id="message" class="msg" role="status" aria-live="polite" hidden></div>
+
+    <section class="panel" aria-labelledby="queueHeading">
+      <div class="panel-head">
+        <h2 id="queueHeading">Queue</h2>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="queueCount" class="q-meta">0 videos queued</span>
+          <button type="button" id="scanBtn" class="btn btn-secondary btn-small" title="Scan the active KEATS page to capture transcript">Scan Page</button>
+        </div>
+      </div>
+      <div id="scanStatus" class="scan-status" hidden></div>
+      <p id="queueEmpty" class="empty">Open a KEATS video and its Transcript panel — it'll be captured automatically.</p>
+      <ol id="queueList" hidden></ol>
+    </section>
+
+    <div class="actions">
+      <button type="button" id="generateBtn" class="btn btn-primary" disabled>Generate Master Notes</button>
+      <button type="button" id="clearBtn" class="btn btn-secondary" disabled>Clear Queue</button>
+    </div>
+
+    <section class="panel" aria-labelledby="notesHeading">
+      <div class="panel-head">
+        <h2 id="notesHeading">Master Notes</h2>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button type="button" id="clearNotesBtn" class="btn btn-secondary btn-small" hidden title="Clear the generated master notes">Clear Notes</button>
+          <button type="button" id="copyBtn" class="btn btn-secondary btn-small" hidden>Copy Markdown</button>
+        </div>
+      </div>
+      <div id="notesGenerating" class="spinner-row" role="status" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Generating master notes…</span>
+      </div>
+      <div id="notesError" class="error-box" role="alert" hidden></div>
+      <p id="notesMeta" class="notes-meta" hidden></p>
+      <div id="notesContent" class="notes" hidden></div>
+      <p id="notesEmpty" class="empty">Master notes will appear here after you click “Generate Master Notes”.</p>
+    </section>
+
+    <section class="panel" id="qaPanel" aria-labelledby="qaHeading" hidden>
+      <div class="panel-head">
+        <h2 id="qaHeading">Ask AI About Notes</h2>
+        <button type="button" id="clearChatBtn" class="btn btn-secondary btn-small" hidden title="Clear conversation history">Clear Chat</button>
+      </div>
+      <div id="qaChips" class="qa-chips">
+        <button type="button" class="qa-chip" data-prompt="Generate 5 practice exam questions with model answers based on these notes.">Practice Exam</button>
+        <button type="button" class="qa-chip" data-prompt="Create flashcards for key definitions and algorithms in these notes.">Flashcards</button>
+        <button type="button" class="qa-chip" data-prompt="What are the most common pitfalls or mistakes to watch out for in these topics?">Common Pitfalls</button>
+        <button type="button" class="qa-chip" data-prompt="Give me a 5-minute quick revision recap of the main points.">Quick Recap</button>
+      </div>
+      <div id="qaMessages" class="qa-messages"></div>
+      <div id="qaThinking" class="spinner-row" role="status" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Thinking…</span>
+      </div>
+      <form id="qaForm" class="qa-form">
+        <textarea id="qaInput" class="qa-input" rows="2" placeholder="Ask AI a question or prompt based on your notes… (Enter to send)"></textarea>
+        <button type="submit" id="qaSendBtn" class="btn btn-primary btn-small qa-send" disabled>Ask</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

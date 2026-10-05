@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "KEATS Video Summariser",
+  "version": "1.0.0",
+  "description": "Auto-captures KEATS (Kaltura) lecture transcripts and synthesises them into master study notes.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["https://generativelanguage.googleapis.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "KEATS Video Summariser"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "*://keats.kcl.ac.uk/*",
+        "*://*.kcl.ac.uk/*",
+        "*://*.kaltura.com/*",
+        "*://*.kaltura.nordu.net/*",
+        "*://*.cloud.kaltura.com/*",
+        "*://*.kaltura.org/*"
+      ],
+      "js": ["content.js"],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_idle"
+    }
+  ]
+}

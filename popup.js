@@ -328,6 +328,7 @@ function init() {
     'copyBtn', 'clearNotesBtn', 'notesGenerating', 'notesError', 'notesMeta', 'notesContent', 'notesEmpty',
     'scanBtn', 'scanStatus',
     'qaPanel', 'qaHeading', 'clearChatBtn', 'qaChips', 'qaMessages', 'qaThinking', 'qaForm', 'qaInput', 'qaSendBtn',
+    'themeToggle', 'themeIconMoon', 'themeIconSun',
   ].forEach(function (id) { els[id] = document.getElementById(id); });
 
   els.queueEmpty.textContent = EMPTY_QUEUE_TEXT;
@@ -338,6 +339,7 @@ function init() {
       els.openTabBtn.style.display = 'none';
     }
   }
+  if (els.themeToggle) els.themeToggle.addEventListener('click', onToggleTheme);
   els.openOptions.addEventListener('click', openOptions);
   els.setApiKey.addEventListener('click', openOptions);
   els.autoCapture.addEventListener('change', onAutoCaptureChange);
@@ -354,6 +356,17 @@ function init() {
   if (els.qaInput) {
     els.qaInput.addEventListener('input', onQaInput);
     els.qaInput.addEventListener('keydown', onQaKeyDown);
+  }
+
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    if (media && media.addEventListener) {
+      media.addEventListener('change', function () {
+        if (!state.settings || !state.settings.theme || state.settings.theme === 'system') {
+          updateThemeIcons();
+        }
+      });
+    }
   }
 
   chrome.storage.onChanged.addListener(onStorageChanged);
@@ -442,6 +455,53 @@ function renderAll() {
 
 function renderSettings() {
   els.autoCapture.checked = !(state.settings && state.settings.autoCapture === false);
+  renderTheme();
+}
+
+function isDarkModeActive() {
+  const theme = state.settings && state.settings.theme;
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+}
+
+function applyTheme(theme) {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  updateThemeIcons();
+}
+
+function updateThemeIcons() {
+  const dark = isDarkModeActive();
+  if (els.themeIconMoon) els.themeIconMoon.hidden = dark;
+  if (els.themeIconSun) els.themeIconSun.hidden = !dark;
+  if (els.themeToggle) {
+    const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    els.themeToggle.title = label;
+    els.themeToggle.setAttribute('aria-label', label);
+  }
+}
+
+function renderTheme() {
+  applyTheme(state.settings && state.settings.theme);
+}
+
+function onToggleTheme() {
+  const currentlyDark = isDarkModeActive();
+  const nextTheme = currentlyDark ? 'light' : 'dark';
+  const newSettings = Object.assign({}, state.settings || {}, { theme: nextTheme });
+  state.settings = newSettings;
+  applyTheme(nextTheme);
+  chrome.storage.local.set({ settings: newSettings });
 }
 
 function renderApiKey() {

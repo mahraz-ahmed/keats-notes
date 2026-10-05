@@ -27,26 +27,88 @@ function validateKey(key) {
 
 const optEls = {};
 let statusTimer = null;
+let currentSettings = {};
 
 function initOptions() {
-  ['keyForm', 'apiKeyInput', 'toggleVisibility', 'saveBtn', 'removeBtn', 'currentKey', 'status']
+  ['keyForm', 'apiKeyInput', 'toggleVisibility', 'saveBtn', 'removeBtn', 'currentKey', 'status', 'themeToggle', 'themeIconMoon', 'themeIconSun']
     .forEach(function (id) { optEls[id] = document.getElementById(id); });
 
   optEls.keyForm.addEventListener('submit', onSave);
   optEls.removeBtn.addEventListener('click', onRemove);
   optEls.toggleVisibility.addEventListener('click', onToggleVisibility);
+  if (optEls.themeToggle) optEls.themeToggle.addEventListener('click', onToggleTheme);
+
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    if (media && media.addEventListener) {
+      media.addEventListener('change', function () {
+        if (!currentSettings || !currentSettings.theme || currentSettings.theme === 'system') {
+          updateThemeIcons();
+        }
+      });
+    }
+  }
 
   chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area === 'local' && 'apiKey' in changes) renderCurrentKey(changes.apiKey.newValue);
+    if (area === 'local') {
+      if ('apiKey' in changes) renderCurrentKey(changes.apiKey.newValue);
+      if ('settings' in changes) {
+        currentSettings = changes.settings.newValue || {};
+        applyTheme(currentSettings.theme);
+      }
+    }
   });
 
-  chrome.storage.local.get('apiKey', function (data) {
+  chrome.storage.local.get(['apiKey', 'settings'], function (data) {
     if (chrome.runtime.lastError) {
       setStatus('Could not read storage: ' + chrome.runtime.lastError.message, 'error');
       return;
     }
     renderCurrentKey(data && data.apiKey);
+    currentSettings = (data && data.settings && typeof data.settings === 'object') ? data.settings : {};
+    applyTheme(currentSettings.theme);
   });
+}
+
+function isDarkModeActive() {
+  const theme = currentSettings && currentSettings.theme;
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+}
+
+function applyTheme(theme) {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  updateThemeIcons();
+}
+
+function updateThemeIcons() {
+  const dark = isDarkModeActive();
+  if (optEls.themeIconMoon) optEls.themeIconMoon.hidden = dark;
+  if (optEls.themeIconSun) optEls.themeIconSun.hidden = !dark;
+  if (optEls.themeToggle) {
+    const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    optEls.themeToggle.title = label;
+    optEls.themeToggle.setAttribute('aria-label', label);
+  }
+}
+
+function onToggleTheme() {
+  const currentlyDark = isDarkModeActive();
+  const nextTheme = currentlyDark ? 'light' : 'dark';
+  currentSettings = Object.assign({}, currentSettings || {}, { theme: nextTheme });
+  applyTheme(nextTheme);
+  chrome.storage.local.set({ settings: currentSettings });
 }
 
 function renderCurrentKey(key) {
@@ -110,6 +172,7 @@ function onRemove() {
 function setVisibility(show) {
   optEls.apiKeyInput.type = show ? 'text' : 'password';
   optEls.toggleVisibility.textContent = show ? 'Hide' : 'Show';
+  optEls.toggleVisibility.setAttribute('aria-label', show ? 'Hide API key' : 'Show API key');
   optEls.toggleVisibility.setAttribute('aria-pressed', show ? 'true' : 'false');
 }
 
@@ -118,3 +181,8 @@ function onToggleVisibility() {
 }
 
 document.addEventListener('DOMContentLoaded', initOptions);
+
+// Export for unit tests in Node
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { maskKey: maskKey, validateKey: validateKey };
+}

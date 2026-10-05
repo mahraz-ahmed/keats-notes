@@ -91,7 +91,7 @@ function onSave(event) {
     optEls.apiKeyInput.value = '';
     setVisibility(false);
     renderCurrentKey(key);
-    setStatus('Saved ✓ (' + maskKey(key) + ')', 'ok');
+    setStatus('Saved (' + maskKey(key) + ')', 'ok');
   });
 }
 

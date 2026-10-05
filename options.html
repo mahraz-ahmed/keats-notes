@@ -6,18 +6,19 @@
   <title>KEATS Video Summariser — Settings</title>
   <style>
     :root {
-      --kcl: #d60036;
-      --kcl-dark: #a50026;
-      --kcl-light: #fdf2f4;
-      --kcl-border: #f8c8d2;
-      --text: #0f172a;
-      --muted: #64748b;
-      --border: #e2e8f0;
-      --bg: #f8fafc;
-      --danger: #b42318;
-      --danger-bg: #fef3f2;
-      --ok: #1b7a3d;
-      --ok-bg: #ecfdf3;
+      --kcl: #c41230;          /* Flat King's Red */
+      --kcl-hover: #a80f28;    /* Darker flat red */
+      --kcl-light: #fef2f2;    /* Flat light tint */
+      --kcl-border: #fecaca;   /* Flat red border */
+      --text: #111827;         /* Deep slate */
+      --muted: #6b7280;        /* Gray 500 */
+      --border: #e5e7eb;       /* Gray 200 */
+      --bg: #f9fafb;           /* Gray 50 */
+      --danger: #b91c1c;
+      --danger-bg: #fef2f2;
+      --ok: #059669;
+      --ok-bg: #ecfdf5;
+      --radius: 6px;
     }
     * { box-sizing: border-box; }
     body {
@@ -27,40 +28,126 @@
       background: var(--bg);
       -webkit-font-smoothing: antialiased;
     }
-    header { background: linear-gradient(135deg, #d60036 0%, #a50026 100%); color: #fff; padding: 18px 28px; box-shadow: 0 2px 8px rgba(165,0,38,0.2); }
-    header h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
-    header p { margin: 3px 0 0; font-size: 13px; opacity: .9; }
-    main { max-width: 580px; margin: 28px auto; padding: 0 20px; }
-    .card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    h2 { margin: 0 0 14px; font-size: 16px; color: var(--kcl-dark); font-weight: 700; }
-    label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+    header {
+      background: var(--kcl);
+      color: #fff;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--kcl-hover);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    header p {
+      margin: 2px 0 0;
+      font-size: 12.5px;
+      opacity: 0.85;
+    }
+    main {
+      max-width: 580px;
+      margin: 28px auto;
+      padding: 0 20px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 15px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
     .input-row { display: flex; gap: 8px; }
     input[type="password"], input[type="text"] {
-      flex: 1; min-width: 0; padding: 10px 12px; font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      flex: 1;
+      min-width: 0;
+      padding: 9px 12px;
+      font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      background: #fff;
     }
-    input:focus { border-color: var(--kcl); outline: none; box-shadow: 0 0 0 3px rgba(214,0,54,0.15); }
-    :focus-visible { outline: 3px solid #fda4af; outline-offset: 2px; }
+    input:focus {
+      border-color: var(--kcl);
+      outline: none;
+    }
+    :focus-visible {
+      outline: 2px solid var(--kcl);
+      outline-offset: 1px;
+    }
     button { font: inherit; cursor: pointer; }
-    button:disabled { cursor: not-allowed; opacity: .45; }
-    .btn { border-radius: 8px; padding: 9px 16px; font-weight: 600; font-size: 13px; border: 1px solid var(--kcl); transition: all .14s; }
-    .btn-primary { background: linear-gradient(135deg, var(--kcl) 0%, var(--kcl-dark) 100%); color: #fff; border-color: var(--kcl-dark); box-shadow: 0 2px 4px rgba(214,0,54,0.2); }
-    .btn-primary:hover:not(:disabled), .btn-primary:focus-visible { background: linear-gradient(135deg, #b8002d 0%, #85001e 100%); box-shadow: 0 4px 8px rgba(214,0,54,0.3); }
-    .btn-secondary { background: #fff; color: var(--kcl); border-color: var(--kcl-border); }
-    .btn-secondary:hover:not(:disabled), .btn-secondary:focus-visible { background: var(--kcl-light); color: var(--kcl-dark); border-color: var(--kcl); }
-    .btn-danger { background: #fff; color: var(--danger); border-color: #fecdca; }
-    .btn-danger:hover:not(:disabled), .btn-danger:focus-visible { background: var(--danger-bg); border-color: var(--danger); }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+    .btn {
+      border-radius: var(--radius);
+      padding: 8px 16px;
+      font-weight: 500;
+      font-size: 13px;
+      border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .btn-primary {
+      background: var(--kcl);
+      color: #fff;
+      border-color: var(--kcl);
+    }
+    .btn-primary:hover:not(:disabled), .btn-primary:focus-visible {
+      background: var(--kcl-hover);
+      border-color: var(--kcl-hover);
+    }
+    .btn-secondary {
+      background: #fff;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover:not(:disabled), .btn-secondary:focus-visible {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
+    .btn-danger {
+      background: #fff;
+      color: var(--danger);
+      border-color: var(--kcl-border);
+    }
+    .btn-danger:hover:not(:disabled), .btn-danger:focus-visible {
+      background: var(--danger-bg);
+      border-color: var(--danger);
+    }
     .actions { display: flex; gap: 8px; margin-top: 14px; }
     .current { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
-    .current code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #f0f4f8; padding: 2px 6px; border-radius: 4px; color: var(--kcl-dark); font-weight: 600; }
+    .current code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--kcl);
+      font-weight: 600;
+    }
     .status { margin-top: 12px; min-height: 1.5em; font-size: 13px; font-weight: 500; }
     .status.ok { color: var(--ok); }
     .status.error { color: var(--danger); }
     .note {
-      margin-top: 18px; padding: 10px 14px; font-size: 12.5px; color: #334e68;
-      background: var(--kcl-light); border-left: 3.5px solid var(--kcl); border-radius: 4px;
+      margin-top: 18px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      color: var(--text);
+      background: var(--kcl-light);
+      border: 1px solid var(--kcl-border);
+      border-radius: var(--radius);
     }
-    .note a { color: var(--kcl); }
+    .note a { color: var(--kcl); text-decoration: underline; }
   </style>
 </head>
 <body>

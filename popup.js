@@ -374,7 +374,7 @@ function init() {
         chrome.tabs.sendMessage(tabs[0].id, { action: 'checkStatus' }, function (res) {
           if (chrome.runtime && chrome.runtime.lastError) return;
           if (res && res.hasPlayer && res.cueCount === 0 && (!state.queue || state.queue.length === 0)) {
-            showScanStatus('💡 Video player detected! Click the player\'s "Transcript" panel, then click "Scan Page".', 'info');
+            showScanStatus('Video player detected. Click the player\'s "Transcript" panel, then click "Scan Page".', 'info');
           }
         });
       }
@@ -659,12 +659,12 @@ async function onScanPage() {
 
     if (withCues.length > 0) {
       const top = withCues[0];
-      showScanStatus('✅ Captured ' + top.cueCount + ' transcript lines from “' + (top.title || 'Video') + '”!', 'success');
+      showScanStatus('Captured ' + top.cueCount + ' transcript lines from “' + (top.title || 'Video') + '”.', 'success');
       showMessage('Notes captured!', 'success');
     } else if (withPlayer.length > 0) {
-      showScanStatus('⚠️ Video player detected, but no transcript cues found yet. Please make sure the "Transcript" tab is opened in the video player, then click "Scan Page" again.', 'warn');
+      showScanStatus('Video player detected, but no transcript cues found yet. Open the "Transcript" tab in the video player, then click "Scan Page" again.', 'warn');
     } else {
-      showScanStatus('ℹ️ No video player found on current tab. If you are on KEATS, make sure the video has loaded.', 'warn');
+      showScanStatus('No video player found on current tab. If you are on KEATS, make sure the video has loaded.', 'warn');
     }
   } catch (err) {
     showScanStatus('Scan failed: ' + (err.message || String(err)), 'warn');
@@ -789,7 +789,7 @@ function renderQa() {
         head.className = 'qa-msg-head';
 
         const label = document.createElement('span');
-        label.textContent = '🎓 Gemini';
+        label.textContent = 'Gemini';
 
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
@@ -888,7 +888,7 @@ function onQaSubmit(e) {
       state.qaPending = false;
       state.notesChat = currentHistory.concat([
         { role: 'user', text: prompt, timestamp: Date.now() },
-        { role: 'model', text: '⚠️ **Error:** ' + (err.message || 'Failed to get a response.'), timestamp: Date.now() }
+        { role: 'model', text: '**Error:** ' + (err.message || 'Failed to get a response.'), timestamp: Date.now() }
       ]);
       renderQa();
       if (els.qaMessages) els.qaMessages.scrollTop = els.qaMessages.scrollHeight;

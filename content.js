@@ -146,46 +146,43 @@
 
     toast.style.cssText = [
       'position: fixed',
-      'top: 20px',
-      'right: 20px',
+      'top: 18px',
+      'right: 18px',
       'z-index: 2147483647',
       'display: flex',
       'align-items: center',
       'gap: 12px',
       'max-width: 380px',
-      'padding: 12px 18px',
-      'background: #d60036',
-      'background: linear-gradient(135deg, #d60036 0%, #a50026 100%)',
+      'padding: 12px 16px',
+      'background: #c41230',
       'color: #ffffff',
-      'border: 1px solid rgba(255, 255, 255, 0.25)',
-      'border-radius: 10px',
-      'box-shadow: 0 10px 28px rgba(165, 0, 38, 0.35), 0 3px 8px rgba(0, 0, 0, 0.15)',
+      'border: 1px solid #a80f28',
+      'border-radius: 6px',
+      'box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15)',
       'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       'font-size: 13.5px',
       'line-height: 1.35',
       'box-sizing: border-box',
       'cursor: pointer',
       'opacity: 0',
-      'transform: translateY(-10px)',
-      'transition: opacity 0.22s ease, transform 0.22s ease',
+      'transform: translateY(-8px)',
+      'transition: opacity 0.2s ease, transform 0.2s ease',
       'pointer-events: auto'
     ].join('; ');
 
     var badge = document.createElement('div');
     badge.style.cssText = [
       'flex: none',
-      'width: 24px',
-      'height: 24px',
-      'border-radius: 50%',
-      'background: #22c55e',
+      'width: 20px',
+      'height: 20px',
+      'border-radius: 4px',
+      'background: rgba(255, 255, 255, 0.2)',
       'color: #ffffff',
       'display: flex',
       'align-items: center',
-      'justify-content: center',
-      'font-size: 14px',
-      'font-weight: 700'
+      'justify-content: center'
     ].join('; ');
-    badge.textContent = '✓';
+    badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
     var body = document.createElement('div');
     body.style.cssText = 'flex: 1; min-width: 0;';

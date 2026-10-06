@@ -590,7 +590,7 @@ function renderButtons() {
   const generating = isGenerating();
   els.generateBtn.disabled = empty || !hasApiKey() || generating || state.generatePending;
   els.clearBtn.disabled = empty;
-  if (!hasApiKey()) els.generateBtn.title = 'Set your Gemini API key first';
+  if (!hasApiKey()) els.generateBtn.title = 'Set your Groq API key first';
   else if (empty) els.generateBtn.title = 'Queue some videos first';
   else if (generating) els.generateBtn.title = 'Generation in progress';
   else els.generateBtn.title = '';
@@ -849,7 +849,7 @@ function renderQa() {
         head.className = 'qa-msg-head';
 
         const label = document.createElement('span');
-        label.textContent = 'Gemini';
+        label.textContent = 'Groq';
 
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
@@ -880,8 +880,8 @@ function renderQa() {
   if (els.qaSendBtn) {
     const text = els.qaInput ? els.qaInput.value.trim() : '';
     els.qaSendBtn.disabled = state.qaPending || !text || !hasApiKey();
-    if (!hasApiKey()) els.qaSendBtn.title = 'Set your Gemini API key first';
-    else if (state.qaPending) els.qaSendBtn.title = 'Waiting for Gemini response';
+    if (!hasApiKey()) els.qaSendBtn.title = 'Set your Groq API key first';
+    else if (state.qaPending) els.qaSendBtn.title = 'Waiting for Groq response';
     else els.qaSendBtn.title = '';
   }
   if (els.qaInput) els.qaInput.disabled = state.qaPending;
@@ -916,7 +916,7 @@ function onQaSubmit(e) {
   const prompt = els.qaInput ? els.qaInput.value.trim() : '';
   if (!prompt) return;
   if (!hasApiKey()) {
-    showMessage('Set your Gemini API key in Options first.');
+    showMessage('Set your Groq API key in Options first.');
     return;
   }
   if (!hasMasterNotes()) {

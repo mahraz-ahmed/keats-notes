@@ -1,7 +1,7 @@
 /* KEATS Video Summariser — background service worker (classic script, MV3). */
 
-const MODEL = 'gemini-3.8-flash';
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse';
+const MODEL = 'qwen/qwen3.8-27b';
+const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MAX_SINGLE_PASS_CHARS = 300000;
 const MAP_CONCURRENCY = 3;
 const TEMPERATURE = 0.3;
@@ -11,7 +11,7 @@ const CONDENSE_MAX_TOKENS = 4000;
 const GENERIC_TITLES = ['kaltura', 'kaltura player', 'player', 'video', 'media', 'untitled'];
 
 const SYNTHESIS_PROMPT =
-  "You are an expert Computer Science tutor at King's College London. You will receive transcripts from multiple lecture videos, in order. Synthesise them into ONE cohesive, overarching Markdown study guide — do not summarise each video separately. Structure: Title; Overview; Learning objectives; Key concepts (grouped by topic across videos, with clear definitions); Worked examples and code blocks where relevant; How the topics connect; Common pitfalls; Revision checklist; Possible exam questions. Use headings, bullet points and fenced code blocks. Do not invent material unsupported by the transcripts.";
+  "You are an expert Computer Science tutor at King's College London. You will receive transcripts from multiple lecture videos. Synthesise them into ONE cohesive, overarching Markdown study guide — do not summarise each video separately. Structure: Title; Overview; Key concepts (grouped by topic across videos, with clear definitions); a practice question or two to drill the key concept into the reader's head (or prefer actionable coding drills based on the key concept if it involves programming) on each key concept. Use headings, bullet points and fenced code blocks. Do not invent material unsupported by the transcripts.";
 
 const CONDENSE_PROMPT =
   'You are an expert Computer Science tutor. Condense this single lecture transcript into detailed, faithful Markdown notes capturing every key concept, definition, example, algorithm and piece of code. Do not invent content.';
@@ -234,7 +234,7 @@ async function handlePromptMasterNotes(msg) {
 
   const apiKey = await getApiKey();
   if (!isNonEmptyString(apiKey)) {
-    return { ok: false, error: 'Set your Google Gemini API key in Options first.' };
+    return { ok: false, error: 'Set your Groq API key in Options first.' };
   }
 
   const masterNotes = await getMasterNotes();
@@ -244,24 +244,24 @@ async function handlePromptMasterNotes(msg) {
   }
 
   const rawHistory = Array.isArray(msg.history) ? msg.history : [];
-  const contents = [];
+  const messages = [];
   for (const item of rawHistory) {
-    if (item && isNonEmptyString(item.text) && (item.role === 'user' || item.role === 'model')) {
-      contents.push({
-        role: item.role,
-        parts: [{ text: item.text }]
+    if (item && isNonEmptyString(item.text) && (item.role === 'user' || item.role === 'model' || item.role === 'assistant')) {
+      messages.push({
+        role: item.role === 'model' ? 'assistant' : item.role,
+        content: item.text
       });
     }
   }
-  contents.push({
+  messages.push({
     role: 'user',
-    parts: [{ text: prompt }]
+    content: prompt
   });
 
-  const answer = await callGemini(
+  const answer = await callGroq(
     apiKey,
     getQaSystemInstruction(notesMarkdown),
-    contents,
+    messages,
     4000
   );
 
@@ -275,38 +275,48 @@ async function handlePromptMasterNotes(msg) {
 }
 
 // ---------------------------------------------------------------------------
-// Google Gemini
+// Groq Cloud
 // ---------------------------------------------------------------------------
 
-async function callGemini(apiKey, systemInstruction, userTextOrContents, maxTokens) {
+async function callGroq(apiKey, systemInstruction, userTextOrMessages, maxTokens) {
   let res;
-  const contents = Array.isArray(userTextOrContents)
-    ? userTextOrContents
-    : [
-        {
-          role: 'user',
-          parts: [{ text: String(userTextOrContents || '') }]
-        }
-      ];
+  const messages = [];
+  if (systemInstruction) {
+    messages.push({
+      role: 'system',
+      content: systemInstruction
+    });
+  }
+
+  if (Array.isArray(userTextOrMessages)) {
+    for (const item of userTextOrMessages) {
+      if (!item) continue;
+      const role = item.role === 'model' ? 'assistant' : (item.role || 'user');
+      const text = typeof item.content === 'string'
+        ? item.content
+        : (item.parts && item.parts[0] && typeof item.parts[0].text === 'string' ? item.parts[0].text : '');
+      if (text) messages.push({ role, content: text });
+    }
+  } else {
+    messages.push({
+      role: 'user',
+      content: String(userTextOrMessages || '')
+    });
+  }
 
   const requestBody = {
-    contents,
-    generationConfig: {
-      temperature: TEMPERATURE,
-      maxOutputTokens: maxTokens
-    }
+    model: MODEL,
+    messages,
+    temperature: TEMPERATURE,
+    max_completion_tokens: maxTokens,
+    stream: true
   };
-  if (systemInstruction) {
-    requestBody.systemInstruction = {
-      parts: [{ text: systemInstruction }]
-    };
-  }
 
   try {
     res = await fetch(API_URL, {
       method: 'POST',
       headers: {
-        'x-goog-api-key': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       // Streaming: response headers arrive quickly and chunks keep flowing, so
@@ -314,7 +324,7 @@ async function callGemini(apiKey, systemInstruction, userTextOrContents, maxToke
       body: JSON.stringify(requestBody)
     });
   } catch (err) {
-    throw new Error('Network error: could not reach the Gemini API. Check your internet connection and try again.');
+    throw new Error('Network error: could not reach the Groq API. Check your internet connection and try again.');
   }
 
   if (!res.ok) {
@@ -325,7 +335,7 @@ async function callGemini(apiKey, systemInstruction, userTextOrContents, maxToke
       data = {};
     }
     const detail = (data && data.error && data.error.message) || res.statusText;
-    throw new Error(`Gemini API error (${res.status}): ${detail}`);
+    throw new Error(`Groq API error (${res.status}): ${detail}`);
   }
 
   let content = '';
@@ -346,15 +356,15 @@ async function callGemini(apiKey, systemInstruction, userTextOrContents, maxToke
       } catch (e) {
         return; // ignore malformed / partial lines
       }
-      if (json.error) throw new Error(`Gemini API error: ${json.error.message || 'unknown error'}`);
-      const candidate = json.candidates && json.candidates[0];
-      if (candidate) {
-        if (candidate.finishReason) finishReason = candidate.finishReason;
-        const parts = candidate.content && candidate.content.parts;
-        if (Array.isArray(parts)) {
-          for (const part of parts) {
-            if (part && typeof part.text === 'string') content += part.text;
-          }
+      if (json.error) throw new Error(`Groq API error: ${json.error.message || 'unknown error'}`);
+      const choice = json.choices && json.choices[0];
+      if (choice) {
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+        const deltaText = choice.delta && choice.delta.content;
+        if (typeof deltaText === 'string') {
+          content += deltaText;
+        } else if (choice.message && typeof choice.message.content === 'string') {
+          content += choice.message.content;
         }
       }
     };
@@ -372,30 +382,26 @@ async function callGemini(apiKey, systemInstruction, userTextOrContents, maxToke
       buffer += decoder.decode();
       if (buffer) handleLine(buffer);
     } catch (err) {
-      if (err && /Gemini API error/.test(err.message)) throw err;
-      throw new Error('Network error while receiving the response from Gemini. Please try again.');
+      if (err && /Groq API error/.test(err.message)) throw err;
+      throw new Error('Network error while receiving the response from Groq. Please try again.');
     }
   } else {
     // Fallback for environments without a readable stream body.
     const data = await res.json();
     const items = Array.isArray(data) ? data : [data];
     for (const item of items) {
-      const candidate = item?.candidates?.[0];
-      if (candidate) {
-        if (candidate.finishReason) finishReason = candidate.finishReason;
-        const parts = candidate.content?.parts;
-        if (Array.isArray(parts)) {
-          for (const part of parts) {
-            if (part && typeof part.text === 'string') content += part.text;
-          }
-        }
+      const choice = item?.choices?.[0];
+      if (choice) {
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+        const msgText = choice.message?.content ?? choice.delta?.content;
+        if (typeof msgText === 'string') content += msgText;
       }
     }
   }
 
   content = content.trim();
-  if (!content) throw new Error('Gemini returned an empty response.');
-  if (finishReason === 'MAX_TOKENS') {
+  if (!content) throw new Error('Groq returned an empty response.');
+  if (finishReason === 'length' || finishReason === 'MAX_TOKENS') {
     content += '\n\n> **Note:** the output reached the token limit and may be incomplete.';
   }
   return content;
@@ -412,7 +418,7 @@ async function condenseTranscript(apiKey, item) {
       transcript.slice(0, MAX_SINGLE_PASS_CHARS) +
       '\n\n[Note: transcript truncated due to length; later content omitted.]';
   }
-  return callGemini(
+  return callGroq(
     apiKey,
     CONDENSE_PROMPT,
     `Lecture video title: ${item.title}\n\nTranscript:\n${transcript}`,
@@ -425,7 +431,7 @@ async function synthesise(apiKey, queue) {
   const combined = buildCombined(queue, (item) => item.transcript);
 
   if (combined.length <= MAX_SINGLE_PASS_CHARS) {
-    return callGemini(
+    return callGroq(
       apiKey,
       SYNTHESIS_PROMPT,
       `The following are transcripts from ${n} lecture video(s), in order.\n\n${combined}`,
@@ -436,7 +442,7 @@ async function synthesise(apiKey, queue) {
   // Map-reduce: condense each video, then synthesise the condensed notes.
   const condensed = await mapWithConcurrency(queue, MAP_CONCURRENCY, (item) => condenseTranscript(apiKey, item));
   const combinedNotes = buildCombined(queue, (item, i) => condensed[i]);
-  return callGemini(
+  return callGroq(
     apiKey,
     SYNTHESIS_PROMPT,
     `The following are condensed notes from the transcripts of ${n} lecture video(s), in order.\n\n${combinedNotes}`,
@@ -460,7 +466,7 @@ async function generateMasterNotes() {
   try {
     const { apiKey } = await chrome.storage.local.get('apiKey');
     if (!isNonEmptyString(apiKey)) {
-      await setMasterNotes({ status: 'error', error: 'Set your Gemini API key in Options.' });
+      await setMasterNotes({ status: 'error', error: 'Set your Groq API key in Options.' });
       return;
     }
     const queue = await getQueue();

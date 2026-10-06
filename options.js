@@ -2,23 +2,23 @@
 
 /*
  * KEATS Video Summariser — options page.
- * Stores the Google Gemini API key in chrome.storage.local.apiKey.
+ * Stores the Groq Cloud API key in chrome.storage.local.apiKey.
  */
 
-/** Mask a key for display, e.g. "AQ.…abcd" or "AIza…abcd". Pure. */
+/** Mask a key for display, e.g. "gsk_…abcd". Pure. */
 function maskKey(key) {
   const k = String(key || '').trim();
   if (!k) return '';
-  const prefixLen = k.startsWith('AQ.') ? 3 : 4;
+  const prefixLen = 4;
   if (k.length <= prefixLen + 4) return k.slice(0, prefixLen) + '…';
   return k.slice(0, prefixLen) + '…' + k.slice(-4);
 }
 
 /** Light validation. Returns an error string, or '' if the key looks OK. Pure. */
 function validateKey(key) {
-  if (!key) return 'Please paste your Google Gemini API key.';
-  if (!key.startsWith('AQ.') && !key.startsWith('AIza')) {
-    return 'That doesn\'t look like a Google Gemini API key — it should start with "AQ." or "AIza".';
+  if (!key) return 'Please paste your Groq API key.';
+  if (!key.startsWith('gsk_')) {
+    return 'That doesn\'t look like a Groq API key — it should start with "gsk_".';
   }
   if (/\s/.test(key)) return 'The key must not contain spaces or line breaks.';
   if (key.length < 20) return 'That key looks too short — please check you copied all of it.';

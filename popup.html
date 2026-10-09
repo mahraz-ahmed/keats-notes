@@ -365,6 +365,259 @@
     .qa-input:focus { outline: none; border-color: var(--kcl); }
     .qa-send { flex: none; height: 38px; padding: 0 13px; }
 
+    /* Master Notes Quiz */
+    .quiz-progress-wrap {
+      height: 6px;
+      background: var(--border-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 4px 0 10px;
+      border: 1px solid var(--border);
+    }
+    .quiz-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--kcl);
+      transition: width .2s ease;
+    }
+    .quiz-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .quiz-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px 12px;
+      background: var(--bg);
+    }
+    .quiz-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .quiz-q-num {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .quiz-topic-badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--kcl-light);
+      color: var(--link-color);
+      border: 1px solid var(--kcl-border);
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .quiz-question {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 9px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .quiz-question code, .quiz-option code, .quiz-feedback code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      background: var(--code-bg);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--code-text);
+      border: 1px solid var(--border-subtle);
+    }
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .quiz-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text);
+      font-size: 12.5px;
+      line-height: 1.4;
+      transition: background .1s, border-color .1s, color .1s, opacity .1s;
+    }
+    .quiz-option:hover:not(:disabled), .quiz-option:focus-visible:not(:disabled) {
+      border-color: var(--kcl);
+      background: var(--kcl-light);
+    }
+    .quiz-option:disabled {
+      cursor: default;
+    }
+    .quiz-option.is-dimmed {
+      opacity: 0.65;
+    }
+    .quiz-opt-letter {
+      flex: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      margin-top: 1px;
+    }
+    .quiz-opt-text {
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .quiz-opt-status {
+      flex: none;
+      font-size: 11.5px;
+      font-weight: 700;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+    .quiz-option.is-correct {
+      background: var(--success-bg);
+      border-color: var(--success-border);
+      color: var(--success);
+      font-weight: 500;
+    }
+    .quiz-option.is-correct .quiz-opt-letter {
+      background: var(--success);
+      color: #ffffff;
+      border-color: var(--success);
+    }
+    .quiz-option.is-wrong {
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: var(--danger);
+      font-weight: 500;
+    }
+    .quiz-option.is-wrong .quiz-opt-letter {
+      background: var(--danger);
+      color: #ffffff;
+      border-color: var(--danger);
+    }
+    .quiz-feedback {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      line-height: 1.45;
+      border: 1px solid transparent;
+    }
+    .quiz-feedback.is-correct {
+      background: var(--success-bg);
+      border-color: var(--success-border);
+      color: var(--success);
+    }
+    .quiz-feedback.is-wrong {
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: var(--danger);
+    }
+    .quiz-feedback-title {
+      font-weight: 700;
+      margin-bottom: 3px;
+      display: block;
+    }
+    .quiz-feedback-note {
+      color: var(--text);
+      display: block;
+    }
+    .quiz-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .quiz-nav-hint {
+      font-size: 11.5px;
+      color: var(--muted);
+      text-align: center;
+      flex: 1;
+    }
+    .quiz-score-card {
+      margin-top: 4px;
+      padding: 14px 12px;
+      border-radius: var(--radius);
+      border: 1.5px solid var(--kcl-border);
+      background: var(--kcl-light);
+      text-align: center;
+    }
+    .quiz-score-heading {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin: 0 0 4px;
+    }
+    .quiz-score-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      margin: 2px 0;
+    }
+    .quiz-score-verdict {
+      font-size: 12.5px;
+      font-weight: 600;
+      margin: 4px 0 10px;
+      color: var(--link-color);
+    }
+    .quiz-topic-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: center;
+      margin: 8px 0 12px;
+    }
+    .quiz-topic-pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .quiz-topic-pill.pass {
+      background: var(--success-bg);
+      color: var(--success);
+      border-color: var(--success-border);
+    }
+    .quiz-topic-pill.fail {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: var(--danger-border);
+    }
+    .quiz-score-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
     /* Responsive Full-Page Desktop Mode */
     @media (min-width: 600px) {
       body {
@@ -460,6 +713,7 @@
       <div class="panel-head">
         <h2 id="notesHeading">Master Notes</h2>
         <div style="display:flex;align-items:center;gap:6px;">
+          <button type="button" id="takeQuizBtn" class="btn btn-primary btn-small" hidden title="Turn your master notes into a multiple-choice quiz">Take Quiz</button>
           <button type="button" id="clearNotesBtn" class="btn btn-secondary btn-small" hidden title="Clear the generated master notes">Clear Notes</button>
           <button type="button" id="copyBtn" class="btn btn-secondary btn-small" hidden>Copy Markdown</button>
         </div>
@@ -472,6 +726,28 @@
       <p id="notesMeta" class="notes-meta" hidden></p>
       <div id="notesContent" class="notes" hidden></div>
       <p id="notesEmpty" class="empty">Master notes will appear here after you click “Generate Master Notes”.</p>
+    </section>
+
+    <section class="panel" id="quizPanel" aria-labelledby="quizHeading" hidden>
+      <div class="panel-head">
+        <h2 id="quizHeading">Master Notes Quiz</h2>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="quizProgressMeta" class="q-meta" hidden></span>
+          <button type="button" id="retryQuizBtn" class="btn btn-secondary btn-small" hidden title="Reset your answers and retry this quiz">Retry Quiz</button>
+          <button type="button" id="generateQuizBtn" class="btn btn-primary btn-small" title="Generate a multiple-choice quiz covering all key topics in your master notes">Generate Quiz</button>
+        </div>
+      </div>
+      <p id="quizEmpty" class="empty">Turn your master notes into a multiple-choice quiz covering all key topics, with instant feedback and a final score.</p>
+      <div id="quizGenerating" class="spinner-row" role="status" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Generating multiple-choice quiz across all key topics…</span>
+      </div>
+      <div id="quizError" class="error-box" role="alert" hidden></div>
+      <div id="quizProgressBarWrap" class="quiz-progress-wrap" hidden>
+        <div id="quizProgressBar" class="quiz-progress-bar"></div>
+      </div>
+      <div id="quizContent" class="quiz-list" hidden></div>
+      <div id="quizScoreCard" hidden></div>
     </section>
 
     <section class="panel" id="qaPanel" aria-labelledby="qaHeading" hidden>

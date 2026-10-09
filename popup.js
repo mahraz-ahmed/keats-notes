@@ -11,7 +11,7 @@
  *    loaded in Node with a stub `document` to unit-test renderMarkdown/escapeHtml.
  */
 
-const STORAGE_KEYS = ['apiKey', 'settings', 'queue', 'masterNotes', 'notesChat'];
+const STORAGE_KEYS = ['apiKey', 'settings', 'queue', 'masterNotes', 'masterQuiz', 'notesChat'];
 const EMPTY_QUEUE_TEXT = "Open a KEATS video and its Transcript panel — it'll be captured automatically.";
 const MESSAGE_TIMEOUT_MS = 6000;
 
@@ -304,6 +304,100 @@ function pluralise(n, one, many) {
   return n + ' ' + (n === 1 ? one : many);
 }
 
+/** Render inline Markdown (code spans, bold, italic, links) safely without outer <p> tags. Pure. */
+function renderInlineMarkdown(s) {
+  const source = String(s == null ? '' : s).replace(/\u0000/g, '');
+  return mdRenderInline(escapeHtml(source));
+}
+
+/**
+ * Compute instant feedback for a selected option on a multiple-choice question. Pure.
+ */
+function getQuizFeedback(question, selectedIndex) {
+  const q = question && typeof question === 'object' ? question : {};
+  const correctIndex = Number(q.correctIndex) || 0;
+  const isCorrect = selectedIndex === correctIndex;
+  const letters = ['A', 'B', 'C', 'D'];
+  const selectedLetter = letters[selectedIndex] || String(selectedIndex + 1);
+  const correctLetter = letters[correctIndex] || String(correctIndex + 1);
+  const optExps = Array.isArray(q.optionExplanations) ? q.optionExplanations : [];
+  const selectedNote = typeof optExps[selectedIndex] === 'string' ? optExps[selectedIndex].trim() : '';
+  const correctNote = typeof optExps[correctIndex] === 'string' ? optExps[correctIndex].trim() : '';
+  const generalExp = typeof q.explanation === 'string' ? q.explanation.trim() : '';
+
+  let title;
+  let note;
+  if (isCorrect) {
+    title = '✓ Correct! (' + selectedLetter + ')';
+    note = selectedNote || generalExp || 'Correct based on your master notes.';
+  } else {
+    title = '✗ Incorrect — You chose ' + selectedLetter + ' (Correct answer: ' + correctLetter + ')';
+    const fallbackRight = generalExp || correctNote;
+    if (selectedNote && fallbackRight && selectedNote.toLowerCase() !== fallbackRight.toLowerCase()) {
+      note = selectedNote + ' ' + fallbackRight;
+    } else {
+      note = selectedNote || fallbackRight || ('Option ' + correctLetter + ' is the correct answer.');
+    }
+  }
+  return {
+    isCorrect: isCorrect,
+    title: title,
+    note: note,
+    correctIndex: correctIndex,
+    correctLetter: correctLetter,
+    selectedLetter: selectedLetter,
+  };
+}
+
+/**
+ * Compute overall score and per-question breakdown for a quiz. Pure.
+ */
+function computeQuizScore(questions, answers) {
+  const list = Array.isArray(questions) ? questions : [];
+  const ansMap = (answers && typeof answers === 'object') ? answers : {};
+  const total = list.length;
+  let answered = 0;
+  let correct = 0;
+  const breakdown = [];
+
+  for (let i = 0; i < total; i++) {
+    const q = list[i] || {};
+    const rawAns = ansMap[i] !== undefined ? ansMap[i] : ansMap[String(i)];
+    const hasAns = rawAns !== undefined && rawAns !== null && Number.isInteger(Number(rawAns));
+    const sel = hasAns ? Number(rawAns) : -1;
+    const isRight = hasAns && sel === Number(q.correctIndex);
+    if (hasAns) answered++;
+    if (isRight) correct++;
+    breakdown.push({
+      index: i,
+      topic: (q.topic && String(q.topic).trim()) || ('Question ' + (i + 1)),
+      answered: hasAns,
+      selectedIndex: sel,
+      isCorrect: isRight,
+    });
+  }
+
+  const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const completed = total > 0 && answered === total;
+  let verdict = '';
+  if (completed) {
+    if (percentage === 100) verdict = 'Perfect score! You mastered every key topic in your notes.';
+    else if (percentage >= 80) verdict = 'Great job! Strong understanding across the key topics.';
+    else if (percentage >= 60) verdict = 'Good effort! Review the missed topics below to solidify your knowledge.';
+    else verdict = 'Keep studying your master notes and retry the quiz to improve your score.';
+  }
+
+  return {
+    total: total,
+    answered: answered,
+    correct: correct,
+    percentage: percentage,
+    completed: completed,
+    verdict: verdict,
+    breakdown: breakdown,
+  };
+}
+
 /* ------------------------------------------------------------------------ *
  * DOM / chrome wiring — only runs after DOMContentLoaded.
  * ------------------------------------------------------------------------ */
@@ -313,9 +407,14 @@ const state = {
   settings: { autoCapture: true },
   queue: [],
   masterNotes: { status: 'idle' },
+  masterQuiz: { status: 'idle' },
   notesChat: [],
   generatePending: false,
+  quizPending: false,
   qaPending: false,
+  quizIndex: 0,
+  quizViewingScore: false,
+  lastQuizTimestamp: 0,
 };
 const els = {};
 let messageTimer = null;
@@ -325,8 +424,10 @@ function init() {
   [
     'autoCapture', 'openTabBtn', 'openOptions', 'apiKeyBanner', 'setApiKey', 'message',
     'queueCount', 'queueEmpty', 'queueList', 'generateBtn', 'clearBtn',
-    'copyBtn', 'clearNotesBtn', 'notesGenerating', 'notesError', 'notesMeta', 'notesContent', 'notesEmpty',
+    'takeQuizBtn', 'copyBtn', 'clearNotesBtn', 'notesGenerating', 'notesError', 'notesMeta', 'notesContent', 'notesEmpty',
     'scanBtn', 'scanStatus',
+    'quizPanel', 'quizHeading', 'quizProgressMeta', 'retryQuizBtn', 'generateQuizBtn',
+    'quizEmpty', 'quizGenerating', 'quizError', 'quizProgressBarWrap', 'quizProgressBar', 'quizContent', 'quizScoreCard',
     'qaPanel', 'qaHeading', 'clearChatBtn', 'qaChips', 'qaMessages', 'qaThinking', 'qaForm', 'qaInput', 'qaSendBtn',
     'themeToggle', 'themeIconMoon', 'themeIconSun',
   ].forEach(function (id) { els[id] = document.getElementById(id); });
@@ -347,8 +448,14 @@ function init() {
   els.clearBtn.addEventListener('click', onClearQueue);
   els.copyBtn.addEventListener('click', onCopy);
   if (els.clearNotesBtn) els.clearNotesBtn.addEventListener('click', onClearNotes);
+  if (els.takeQuizBtn) els.takeQuizBtn.addEventListener('click', onTakeQuizClick);
   els.queueList.addEventListener('click', onQueueListClick);
   if (els.scanBtn) els.scanBtn.addEventListener('click', onScanPage);
+
+  if (els.generateQuizBtn) els.generateQuizBtn.addEventListener('click', onGenerateQuiz);
+  if (els.retryQuizBtn) els.retryQuizBtn.addEventListener('click', onRetryQuiz);
+  if (els.quizContent) els.quizContent.addEventListener('click', onQuizOptionClick);
+  if (els.quizScoreCard) els.quizScoreCard.addEventListener('click', onQuizScoreCardClick);
 
   if (els.clearChatBtn) els.clearChatBtn.addEventListener('click', onClearChat);
   if (els.qaForm) els.qaForm.addEventListener('submit', onQaSubmit);
@@ -405,6 +512,38 @@ function applyStorage(data) {
   if ('masterNotes' in data) {
     state.masterNotes = (data.masterNotes && typeof data.masterNotes === 'object') ? data.masterNotes : { status: 'idle' };
   }
+  if ('masterQuiz' in data) {
+    const nextQuiz = (data.masterQuiz && typeof data.masterQuiz === 'object') ? data.masterQuiz : { status: 'idle' };
+    const prevTs = state.lastQuizTimestamp || 0;
+    const nextTs = Number(nextQuiz.generatedAt) || 0;
+    const wasIdleOrGen = !state.masterQuiz || state.masterQuiz.status !== 'done';
+    state.masterQuiz = nextQuiz;
+
+    if (nextQuiz.status !== 'done') {
+      state.quizIndex = 0;
+      state.quizViewingScore = false;
+      state.lastQuizTimestamp = 0;
+    } else if (nextTs !== prevTs || wasIdleOrGen) {
+      state.lastQuizTimestamp = nextTs;
+      const qs = Array.isArray(nextQuiz.questions) ? nextQuiz.questions : [];
+      const ans = (nextQuiz.answers && typeof nextQuiz.answers === 'object') ? nextQuiz.answers : {};
+      let firstUnanswered = -1;
+      for (let i = 0; i < qs.length; i++) {
+        const raw = ans[i] !== undefined ? ans[i] : ans[String(i)];
+        if (raw === undefined || raw === null || !Number.isInteger(Number(raw))) {
+          firstUnanswered = i;
+          break;
+        }
+      }
+      if (firstUnanswered === -1 && qs.length > 0) {
+        state.quizIndex = qs.length - 1;
+        state.quizViewingScore = true;
+      } else {
+        state.quizIndex = Math.max(0, firstUnanswered);
+        state.quizViewingScore = false;
+      }
+    }
+  }
   if ('notesChat' in data) {
     state.notesChat = Array.isArray(data.notesChat) ? data.notesChat : [];
   }
@@ -444,12 +583,17 @@ function isGenerating() {
   return state.masterNotes && state.masterNotes.status === 'generating';
 }
 
+function isGeneratingQuiz() {
+  return state.masterQuiz && state.masterQuiz.status === 'generating';
+}
+
 function renderAll() {
   renderSettings();
   renderApiKey();
   renderQueue();
   renderNotes();
   renderButtons();
+  renderQuiz();
   renderQa();
 }
 
@@ -572,6 +716,7 @@ function renderNotes() {
   els.notesContent.hidden = !showMarkdown;
   els.copyBtn.hidden = !showMarkdown;
   if (els.clearNotesBtn) els.clearNotesBtn.hidden = !showMarkdown;
+  if (els.takeQuizBtn) els.takeQuizBtn.hidden = !showMarkdown;
   els.notesContent.innerHTML = showMarkdown ? renderMarkdown(markdown) : '';
 
   const metaParts = [];
@@ -825,6 +970,404 @@ function hasMasterNotes() {
   );
 }
 
+function renderQuiz() {
+  if (!els.quizPanel) return;
+  const ready = hasMasterNotes();
+  els.quizPanel.hidden = !ready;
+  if (!ready) return;
+
+  const quiz = state.masterQuiz || { status: 'idle' };
+  const status = quiz.status || 'idle';
+  const generating = status === 'generating' || state.quizPending;
+  const showError = status === 'error' && !generating;
+  const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+  const answers = (quiz.answers && typeof quiz.answers === 'object') ? quiz.answers : {};
+  const hasQuiz = !generating && status === 'done' && questions.length > 0;
+  const score = computeQuizScore(questions, answers);
+
+  const qIdx = hasQuiz
+    ? Math.min(Math.max(0, Number(state.quizIndex) || 0), questions.length - 1)
+    : 0;
+  state.quizIndex = qIdx;
+  const showingScore = Boolean(hasQuiz && state.quizViewingScore && score.completed);
+
+  if (els.generateQuizBtn) {
+    els.generateQuizBtn.disabled = generating || !hasApiKey();
+    els.generateQuizBtn.textContent = hasQuiz ? 'New Quiz' : 'Generate Quiz';
+  }
+  if (els.retryQuizBtn) {
+    els.retryQuizBtn.hidden = !hasQuiz || score.answered === 0;
+    els.retryQuizBtn.disabled = generating;
+  }
+  if (els.quizProgressMeta) {
+    els.quizProgressMeta.hidden = !hasQuiz;
+    if (hasQuiz) {
+      if (showingScore) {
+        els.quizProgressMeta.textContent =
+          'Completed · ' + score.correct + ' / ' + score.total + ' right (' + score.percentage + '%)';
+      } else {
+        els.quizProgressMeta.textContent =
+          'Q' + (qIdx + 1) + ' of ' + score.total + ' · ' + score.correct + ' / ' + score.answered + ' right';
+      }
+    }
+  }
+
+  if (els.quizGenerating) els.quizGenerating.hidden = !generating;
+  if (els.quizError) {
+    els.quizError.hidden = !showError;
+    els.quizError.textContent = showError ? ('Error: ' + (quiz.error || 'Could not generate quiz.')) : '';
+  }
+  if (els.quizEmpty) els.quizEmpty.hidden = generating || showError || hasQuiz;
+
+  if (els.quizProgressBarWrap) els.quizProgressBarWrap.hidden = !hasQuiz;
+  if (els.quizProgressBar && hasQuiz) {
+    const pct = score.total > 0 ? Math.round((score.answered / score.total) * 100) : 0;
+    els.quizProgressBar.style.width = pct + '%';
+  }
+
+  if (els.quizContent) {
+    els.quizContent.hidden = !hasQuiz || showingScore;
+    els.quizContent.textContent = '';
+    if (hasQuiz && !showingScore) {
+      const q = questions[qIdx];
+      if (q && typeof q === 'object') {
+        const letters = ['A', 'B', 'C', 'D'];
+        const card = document.createElement('div');
+        card.className = 'quiz-card';
+
+        const head = document.createElement('div');
+        head.className = 'quiz-card-head';
+
+        const qNum = document.createElement('span');
+        qNum.className = 'quiz-q-num';
+        qNum.textContent = 'Question ' + (qIdx + 1) + ' of ' + score.total;
+
+        const badge = document.createElement('span');
+        badge.className = 'quiz-topic-badge';
+        const topicText = (q.topic && String(q.topic).trim()) || 'Key Concept';
+        badge.textContent = topicText;
+        badge.title = topicText;
+
+        head.appendChild(qNum);
+        head.appendChild(badge);
+        card.appendChild(head);
+
+        const qStem = document.createElement('p');
+        qStem.className = 'quiz-question';
+        qStem.innerHTML = renderInlineMarkdown(q.question || '');
+        card.appendChild(qStem);
+
+        const optsWrap = document.createElement('div');
+        optsWrap.className = 'quiz-options';
+
+        const rawAns = answers[qIdx] !== undefined ? answers[qIdx] : answers[String(qIdx)];
+        const isAnswered = rawAns !== undefined && rawAns !== null && Number.isInteger(Number(rawAns));
+        const selectedIdx = isAnswered ? Number(rawAns) : -1;
+        const correctIdx = Number(q.correctIndex) || 0;
+        const opts = Array.isArray(q.options) ? q.options : [];
+
+        opts.forEach(function (optText, optIdx) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'quiz-option';
+          btn.dataset.questionIndex = String(qIdx);
+          btn.dataset.optionIndex = String(optIdx);
+          btn.disabled = isAnswered;
+
+          if (isAnswered) {
+            if (optIdx === correctIdx) {
+              btn.classList.add('is-correct');
+            } else if (optIdx === selectedIdx) {
+              btn.classList.add('is-wrong');
+            } else {
+              btn.classList.add('is-dimmed');
+            }
+          }
+
+          const letterSpan = document.createElement('span');
+          letterSpan.className = 'quiz-opt-letter';
+          letterSpan.textContent = letters[optIdx] || String(optIdx + 1);
+
+          const textSpan = document.createElement('span');
+          textSpan.className = 'quiz-opt-text';
+          textSpan.innerHTML = renderInlineMarkdown(optText);
+
+          btn.appendChild(letterSpan);
+          btn.appendChild(textSpan);
+
+          if (isAnswered && (optIdx === correctIdx || optIdx === selectedIdx)) {
+            const statusSpan = document.createElement('span');
+            statusSpan.className = 'quiz-opt-status';
+            statusSpan.textContent = optIdx === correctIdx ? '✓ Right' : '✗ Wrong';
+            btn.appendChild(statusSpan);
+          }
+
+          optsWrap.appendChild(btn);
+        });
+
+        card.appendChild(optsWrap);
+
+        if (isAnswered) {
+          const fb = getQuizFeedback(q, selectedIdx);
+          const fbBox = document.createElement('div');
+          fbBox.className = 'quiz-feedback ' + (fb.isCorrect ? 'is-correct' : 'is-wrong');
+          fbBox.setAttribute('role', 'status');
+
+          const fbTitle = document.createElement('span');
+          fbTitle.className = 'quiz-feedback-title';
+          fbTitle.textContent = fb.title;
+
+          const fbNote = document.createElement('span');
+          fbNote.className = 'quiz-feedback-note';
+          fbNote.innerHTML = renderInlineMarkdown(fb.note);
+
+          fbBox.appendChild(fbTitle);
+          fbBox.appendChild(fbNote);
+          card.appendChild(fbBox);
+        }
+
+        // Single-question stepper navigation
+        const nav = document.createElement('div');
+        nav.className = 'quiz-nav';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.type = 'button';
+        prevBtn.className = 'btn btn-secondary btn-small';
+        prevBtn.dataset.quizNav = 'prev';
+        prevBtn.disabled = qIdx === 0;
+        prevBtn.textContent = '← Previous';
+
+        const navHint = document.createElement('span');
+        navHint.className = 'quiz-nav-hint';
+        if (!isAnswered) {
+          navHint.textContent = 'Select an option above';
+        } else if (score.completed) {
+          navHint.textContent = 'All ' + score.total + ' questions answered';
+        } else {
+          navHint.textContent = score.answered + ' of ' + score.total + ' answered';
+        }
+
+        const rightActions = document.createElement('div');
+        rightActions.style.display = 'flex';
+        rightActions.style.gap = '6px';
+        rightActions.style.alignItems = 'center';
+
+        const isLast = qIdx >= questions.length - 1;
+        if (score.completed && !isLast) {
+          const scoreJumpBtn = document.createElement('button');
+          scoreJumpBtn.type = 'button';
+          scoreJumpBtn.className = 'btn btn-secondary btn-small';
+          scoreJumpBtn.dataset.quizNav = 'finish';
+          scoreJumpBtn.textContent = 'Final Score';
+          rightActions.appendChild(scoreJumpBtn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'btn btn-primary btn-small';
+        if (isLast) {
+          nextBtn.dataset.quizNav = 'finish';
+          nextBtn.disabled = !score.completed;
+          nextBtn.textContent = 'View Final Score →';
+        } else {
+          nextBtn.dataset.quizNav = 'next';
+          nextBtn.disabled = !isAnswered;
+          nextBtn.textContent = 'Next Question →';
+        }
+        rightActions.appendChild(nextBtn);
+
+        nav.appendChild(prevBtn);
+        nav.appendChild(navHint);
+        nav.appendChild(rightActions);
+        card.appendChild(nav);
+
+        els.quizContent.appendChild(card);
+      }
+    }
+  }
+
+  if (els.quizScoreCard) {
+    els.quizScoreCard.hidden = !showingScore;
+    els.quizScoreCard.textContent = '';
+    if (showingScore) {
+      els.quizScoreCard.className = 'quiz-score-card';
+
+      const heading = document.createElement('p');
+      heading.className = 'quiz-score-heading';
+      heading.textContent = 'Quiz Complete — Final Score';
+
+      const value = document.createElement('div');
+      value.className = 'quiz-score-value';
+      value.textContent = score.correct + ' / ' + score.total + ' (' + score.percentage + '%)';
+
+      const verdict = document.createElement('p');
+      verdict.className = 'quiz-score-verdict';
+      verdict.textContent = score.verdict;
+
+      const summary = document.createElement('div');
+      summary.className = 'quiz-topic-summary';
+      score.breakdown.forEach(function (item) {
+        const pill = document.createElement('span');
+        pill.className = 'quiz-topic-pill ' + (item.isCorrect ? 'pass' : 'fail');
+        pill.dataset.reviewIndex = String(item.index);
+        pill.style.cursor = 'pointer';
+        pill.title = 'Click to review Question ' + (item.index + 1);
+        pill.textContent = (item.isCorrect ? '✓ ' : '✗ ') + 'Q' + (item.index + 1) + ': ' + item.topic;
+        summary.appendChild(pill);
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'quiz-score-actions';
+
+      const reviewBtn = document.createElement('button');
+      reviewBtn.type = 'button';
+      reviewBtn.className = 'btn btn-secondary btn-small';
+      reviewBtn.dataset.quizAction = 'review';
+      reviewBtn.textContent = 'Review Questions';
+
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'btn btn-secondary btn-small';
+      retryBtn.dataset.quizAction = 'retry';
+      retryBtn.textContent = 'Retry Quiz';
+
+      const newBtn = document.createElement('button');
+      newBtn.type = 'button';
+      newBtn.className = 'btn btn-primary btn-small';
+      newBtn.dataset.quizAction = 'new';
+      newBtn.textContent = 'Generate New Quiz';
+
+      actions.appendChild(reviewBtn);
+      actions.appendChild(retryBtn);
+      actions.appendChild(newBtn);
+
+      els.quizScoreCard.appendChild(heading);
+      els.quizScoreCard.appendChild(value);
+      els.quizScoreCard.appendChild(verdict);
+      els.quizScoreCard.appendChild(summary);
+      els.quizScoreCard.appendChild(actions);
+    }
+  }
+}
+
+function onTakeQuizClick() {
+  if (els.quizPanel && els.quizPanel.scrollIntoView) {
+    els.quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  const status = state.masterQuiz && state.masterQuiz.status;
+  if (status !== 'done' && status !== 'generating' && !state.quizPending) {
+    onGenerateQuiz();
+  }
+}
+
+function onGenerateQuiz() {
+  if (isGeneratingQuiz() || state.quizPending) return;
+  if (!hasApiKey()) {
+    showMessage('Set your Groq API key in Options first.');
+    return;
+  }
+  if (!hasMasterNotes()) {
+    showMessage('Generate master notes first.');
+    return;
+  }
+  state.quizPending = true;
+  state.quizIndex = 0;
+  state.quizViewingScore = false;
+  renderQuiz();
+  sendMessage({ action: 'generateMasterQuiz' })
+    .catch(function (err) {
+      showMessage('Could not start quiz generation: ' + err.message);
+    })
+    .then(function () {
+      state.quizPending = false;
+      renderQuiz();
+    });
+}
+
+function onRetryQuiz() {
+  if (!state.masterQuiz || state.masterQuiz.status !== 'done') return;
+  state.masterQuiz = Object.assign({}, state.masterQuiz, { answers: {} });
+  state.quizIndex = 0;
+  state.quizViewingScore = false;
+  renderQuiz();
+  sendMessage({ action: 'resetMasterQuiz' }).catch(function (err) {
+    showMessage('Could not reset quiz: ' + err.message);
+  });
+}
+
+function onQuizOptionClick(event) {
+  const navBtn = event.target && event.target.closest ? event.target.closest('[data-quiz-nav]') : null;
+  if (navBtn) {
+    if (navBtn.disabled) return;
+    const navAction = navBtn.dataset.quizNav;
+    const questions = (state.masterQuiz && Array.isArray(state.masterQuiz.questions)) ? state.masterQuiz.questions : [];
+    if (navAction === 'prev' && state.quizIndex > 0) {
+      state.quizIndex -= 1;
+      state.quizViewingScore = false;
+      renderQuiz();
+    } else if (navAction === 'next' && state.quizIndex < questions.length - 1) {
+      state.quizIndex += 1;
+      state.quizViewingScore = false;
+      renderQuiz();
+    } else if (navAction === 'finish') {
+      state.quizViewingScore = true;
+      renderQuiz();
+    }
+    return;
+  }
+
+  const btn = event.target && event.target.closest ? event.target.closest('.quiz-option') : null;
+  if (!btn || btn.disabled) return;
+  const qIdx = Number(btn.dataset.questionIndex);
+  const optIdx = Number(btn.dataset.optionIndex);
+  if (!Number.isInteger(qIdx) || !Number.isInteger(optIdx)) return;
+  if (!state.masterQuiz || state.masterQuiz.status !== 'done') return;
+
+  const currentAnswers = Object.assign({}, (state.masterQuiz.answers && typeof state.masterQuiz.answers === 'object') ? state.masterQuiz.answers : {});
+  if (String(qIdx) in currentAnswers || qIdx in currentAnswers) return;
+
+  currentAnswers[String(qIdx)] = optIdx;
+  state.masterQuiz = Object.assign({}, state.masterQuiz, { answers: currentAnswers });
+  renderQuiz();
+
+  sendMessage({
+    action: 'answerQuizQuestion',
+    questionIndex: qIdx,
+    optionIndex: optIdx,
+  }).catch(function (err) {
+    showMessage('Could not save quiz answer: ' + err.message);
+  });
+}
+
+function onQuizScoreCardClick(event) {
+  const pill = event.target && event.target.closest ? event.target.closest('[data-review-index]') : null;
+  if (pill) {
+    const revIdx = Number(pill.dataset.reviewIndex);
+    if (Number.isInteger(revIdx) && revIdx >= 0) {
+      state.quizIndex = revIdx;
+      state.quizViewingScore = false;
+      renderQuiz();
+    }
+    return;
+  }
+
+  const btn = event.target && event.target.closest ? event.target.closest('[data-quiz-action]') : null;
+  if (!btn) return;
+  const action = btn.dataset.quizAction;
+  if (action === 'review') {
+    state.quizIndex = 0;
+    state.quizViewingScore = false;
+    renderQuiz();
+  } else if (action === 'retry') {
+    onRetryQuiz();
+    if (els.quizPanel && els.quizPanel.scrollIntoView) {
+      els.quizPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } else if (action === 'new') {
+    onGenerateQuiz();
+  }
+}
+
 function renderQa() {
   if (!els.qaPanel) return;
   const ready = hasMasterNotes();
@@ -969,5 +1512,12 @@ document.addEventListener('DOMContentLoaded', init);
 
 // Allow `require('./popup.js')` in Node tests (no effect in the browser).
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { renderMarkdown: renderMarkdown, escapeHtml: escapeHtml, formatTime: formatTime };
+  module.exports = {
+    renderMarkdown: renderMarkdown,
+    renderInlineMarkdown: renderInlineMarkdown,
+    escapeHtml: escapeHtml,
+    formatTime: formatTime,
+    getQuizFeedback: getQuizFeedback,
+    computeQuizScore: computeQuizScore,
+  };
 }

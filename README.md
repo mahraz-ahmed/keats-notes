@@ -21,6 +21,10 @@ A Manifest V3 Chrome extension built for King's College London students that **a
     - **Practice Questions & Actionable Coding Drills** for each concept
   - **Map-Reduce for Large Queues**: Queues up to `300,000` characters are synthesised in a single pass. Larger queues automatically condense each video transcript concurrently (up to 3 in parallel) before synthesising the final master guide.
   - **Resilient Background Streaming**: Streams Server-Sent Events (SSE) from Groq Cloud and keeps the MV3 service worker alive during long generations, allowing you to close the popup while notes generate in the background.
+- **Master Notes Quiz (Multiple-Choice Topic Quiz)**
+  - Click **Take Quiz** / **Generate Quiz** once master notes are generated to turn your study guide into an interactive multiple-choice quiz covering every key topic in your notes.
+  - **Instant Feedback**: Selecting an option immediately tells you whether it is right or wrong along with a brief explanation of why.
+  - **Final Score & Topic Breakdown**: Displays your overall score (`X / N` and percentage) at the end of the quiz, with per-topic results and options to **Retry Quiz** or **Generate New Quiz**.
 - **Ask AI About Notes (Interactive Q&A Tutor)**
   - Unlocked automatically once master notes are generated.
   - Multi-turn chat grounded directly in your generated study guide, persisted across sessions.
@@ -55,12 +59,13 @@ A Manifest V3 Chrome extension built for King's College London students that **a
    - If a video hasn't been captured yet, open the extension popup and click **Scan Page** for immediate capture and status diagnostics.
 3. **Build Your Queue**: Repeat across as many lecture videos as you want to combine. Open the popup to view queued videos, line counts, and capture timestamps, or remove individual videos with **×**.
 4. **Generate Master Notes**: Click **Generate Master Notes**. You can freely close the popup or switch tabs — generation runs in the background service worker and saves automatically when complete.
-5. **Study & Ask Follow-Up Questions**:
+5. **Study, Take the Quiz & Ask Follow-Up Questions**:
    - Read the formatted study guide directly in the popup, or click **Open in new tab** (`↗`) for a full-page view.
+   - Click **Take Quiz** (or **Generate Quiz** in the **Master Notes Quiz** panel) to test yourself across all key topics with 4-option multiple-choice questions, instant right/wrong explanations, and a final score card.
    - Use the **Ask AI About Notes** panel beneath your notes to click a quick-prompt chip (**Practice Exam**, **Flashcards**, **Common Pitfalls**, **Quick Recap**) or ask custom questions.
 6. **Export or Reset**:
    - Click **Copy Markdown** to copy the study guide to your clipboard for Notion, Obsidian, or local `.md` files.
-   - Use **Clear Notes** to reset the generated guide and chat, or **Clear Queue** to empty the video queue.
+   - Use **Clear Notes** to reset the generated guide, quiz, and chat, or **Clear Queue** to empty the video queue.
 
 ---
 
@@ -70,8 +75,8 @@ A Manifest V3 Chrome extension built for King's College London students that **a
 |---|---|
 | `manifest.json` | Manifest V3 configuration. Declares `storage`, `activeTab`, and `scripting` permissions, host permissions for `https://api.groq.com/*`, background service worker, and all-frame content scripts for KEATS (`*.kcl.ac.uk`) and Kaltura (`*.kaltura.com`, `*.kaltura.nordu.net`, `*.cloud.kaltura.com`, `*.kaltura.org`). |
 | `content.js` | Runs in every frame on matching KEATS/Kaltura pages. Observes the DOM (including open Shadow DOM roots) and `<video>` text tracks for transcript cues, auto-opens the transcript panel when needed, sends `pageContextCaptured` (top frame) and `videoTranscriptCaptured` (player frame) messages, handles manual `scanPage` requests, and renders the on-page capture toast. |
-| `background.js` | MV3 service worker. Serialises queue and storage writes with a promise lock, pairs frame transcripts with top-frame tab context stored in `chrome.storage.session`, deduplicates videos by Kaltura `entry_id`, orchestrates single-pass and map-reduce synthesis via streaming Groq Cloud API calls (`qwen/qwen3.8-27b`), handles multi-turn Q&A requests (`promptMasterNotes`), and recovers interrupted generations on startup. |
-| `popup.html` / `popup.js` | Extension popup and responsive full-tab study dashboard. Manages the video queue UI, manual page scanner, theme toggle (Light / Dark / System), zero-dependency XSS-safe Markdown renderer, clipboard export, and the interactive **Ask AI About Notes** chat interface. |
+| `background.js` | MV3 service worker. Serialises queue and storage writes with a promise lock, pairs frame transcripts with top-frame tab context stored in `chrome.storage.session`, deduplicates videos by Kaltura `entry_id`, orchestrates single-pass and map-reduce synthesis via streaming Groq Cloud API calls (`qwen/qwen3.8-27b`), generates topic-complete multiple-choice quizzes (`generateMasterQuiz`), handles multi-turn Q&A requests (`promptMasterNotes`), and recovers interrupted generations on startup. |
+| `popup.html` / `popup.js` | Extension popup and responsive full-tab study dashboard. Manages the video queue UI, manual page scanner, theme toggle (Light / Dark / System), zero-dependency XSS-safe Markdown renderer, clipboard export, the interactive **Master Notes Quiz** with instant feedback and final scoring, and the **Ask AI About Notes** chat interface. |
 | `options.html` / `options.js` | Settings page for validating (`gsk_…`), masking, saving, and removing your Groq Cloud API key in `chrome.storage.local`, plus theme toggling. |
 
 ---
